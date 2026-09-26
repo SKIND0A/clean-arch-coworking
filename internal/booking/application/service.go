@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/big"
 
 	"github.com/google/uuid"
 
@@ -164,3 +165,24 @@ func (s *Service) ConfirmPayment(ctx context.Context, input ConfirmPaymentInput)
 	)
 	return nil
 }
+
+func (s *Service) CancelBooking(ctx context.Context, id BookingResponse) error{
+	booking, err := s.repo.FindByID(ctx, id.ID )
+	if err != nil{
+		return err
+	}
+	err = booking.Cancel()
+	if err != nil{
+		return err
+	}
+	err = s.repo.Save(ctx, booking)
+	if err != nil{
+		return err
+	}
+	events := booking.PullEvents()
+	err = s.bus.Publish(ctx, events)
+	if err != nil{
+		return err
+	}
+	return nil
+}	
