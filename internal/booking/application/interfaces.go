@@ -11,6 +11,7 @@ type BookingService interface {
 	CreateBooking(ctx context.Context, input CreateBookingInput) (uuid.UUID, error)
 	GetBooking(ctx context.Context, id uuid.UUID) (*BookingResponse, error)
 	ConfirmPayment(ctx context.Context, input ConfirmPaymentInput) error
+	CancelBooking(ctx context.Context, id uuid.UUID) error
 }
 
 type BookingRepo interface {

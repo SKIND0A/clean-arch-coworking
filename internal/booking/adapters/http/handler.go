@@ -26,6 +26,7 @@ func NewRouter(svc application.BookingService, logger *slog.Logger) http.Handler
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /bookings", h.CreateBooking)
 	mux.HandleFunc("GET /bookings/{id}", h.GetBooking)
+	mux.HandleFunc("POST /bookings/{id}/cancel", h.CancelBooking)
 
 	// Apply middleware chain: Recovery -> Logger -> RequestID -> mux
 	var handler http.Handler = mux
@@ -116,4 +117,27 @@ func writeError(w http.ResponseWriter, err error) {
 	default:
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
+}
+
+func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
+	rawID := r.PathValue("id")
+	bookingID, err := uuid.Parse(rawID)
+	if err != nil {
+		http.Error(w, "invalid booking id", http.StatusBadRequest)
+		return
+	}
+	err = h.svc.CancelBooking(r.Context(), bookingID)
+	if err != nil{
+		switch{
+		case errors.Is(err, domain.ErrBookingNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case errors.Is(err, domain.ErrBookingAlreadyPaid):
+			http.Error(w, err.Error(), http.StatusConflict)
+		case errors.Is(err, domain.ErrAlreadyCancelled):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+	}
+
 }
