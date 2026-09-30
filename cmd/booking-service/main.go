@@ -49,6 +49,9 @@ func main() {
 	eventStore := outbox.NewEventStore(bus)
 	uow := transaction.NewUnitOfWork(repo, eventStore)
 
+	backoff := outbox.NewBackoff()
+	poller := outbox.NewOutboxPoller(eventStore.(*outbox.EventStore), bus, backoff, 1*time.Second, 20)
+
 	svc := application.NewService(repo, bus, availabilityChecker, priceCalculator, uow, logger)
 	handler := bookinghttp.NewRouter(svc, logger)
 
@@ -64,6 +67,9 @@ func main() {
 	// Graceful shutdown on SIGINT / SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	poller.Start(ctx)
+	logger.Info("outbox poller started")
 
 	go func() {
 		logger.Info("starting booking service", "addr", srv.Addr)
@@ -83,5 +89,8 @@ func main() {
 		logger.Error("shutdown error", "error", err)
 		os.Exit(1)
 	}
+	poller.Stop()
+	logger.Info("outbox poller stopped")
+
 	logger.Info("server stopped")
 }
